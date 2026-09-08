@@ -11,14 +11,12 @@ authors:
   - given-names: Matilda
     family-names: Mikkola Jäghammar
     email: matilda.mikkola.jaghammar@ki.se
-    affiliation: 'Karolinska Institute '
+    affiliation: Karolinska Institutet
     orcid: 'https://orcid.org/0009-0000-2748-2044'
 identifiers:
-  - type: url
-    value: >-
-      https://github.com/matildamikkolajaghammar/2PAD_repository
+  - type: doi
+    value: 10.5281/zenodo.22657032
 repository-code: >-
-  https://github.com/matildamikkolajaghammar/2PAD_repository.git
-url: 'https://github.com/'
-version: '1.0'
-date-released: '2026-09-03'
+  https://github.com/matildamikkolajaghammar/3PAD_repository.git
+version: '1.2'
+date-released: '2026-09-08'
