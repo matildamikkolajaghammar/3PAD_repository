@@ -21,7 +21,7 @@ repository-code: >-
 commit: '1.2'
 date-released: '2026-09-08'
 preferred-citation:
-  type: software
+  type: software-code
   title: 3PAD Repository
   authors:
     - given-names: Matilda
