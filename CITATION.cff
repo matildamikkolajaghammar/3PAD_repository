@@ -18,6 +18,7 @@ identifiers:
     value: 10.5281/zenodo.22657032
 repository-code: >-
   https://github.com/matildamikkolajaghammar/3PAD_repository.git
+date-released: '2026-09-08'
 preferred-citation:
   type: software-code
   title: 3PAD Repository
