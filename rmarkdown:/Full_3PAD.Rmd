@@ -79,21 +79,20 @@ combined_preg <- subset_3pad %>%
     PAR_mean_T2 = PARMean2,
     meds = factor(meds)
   )
-# Replace the two parity lines with this single unified parity variable
+# One single unified parity variable
 combined_preg <- combined_preg %>%
   mutate(
     parity = factor(ifelse(
       is.na(parity_T1), 
-      as.character(parity_T2),  # Use T2 if T1 missing
-      as.character(parity_T1)   # Otherwise use T1
+      as.character(parity_T2),
+      as.character(parity_T1)   
     ))
   ) %>%
-  # Drop the old separate columns (optional)
   dplyr::select(-parity_T1, -parity_T2)
 
 ```
 
-## **Variable list**
+**Variable list**
 
 **T1= early pregnancy; T2 = late pregnancy**
 
@@ -126,6 +125,46 @@ combined_preg <- combined_preg %>%
 ```{r missingness, echo=FALSE, warning=FALSE, message=FALSE}
 md.pattern(combined_preg, rotate.names = T)
 gg_miss_var(combined_preg)
+
+combined_preg$SPDD_T2_group <- ifelse(
+  is.na(combined_preg$SPDD_T2),
+  NA,
+  ifelse(combined_preg$SPDD_T2 > 0, 1, 0)
+)
+
+combined_preg$SPDD_T2_group <- as.factor(combined_preg$SPDD_T2_group)
+levels(combined_preg$SPDD_T2_group) <- c("Non-typical", "Typical")
+
+combined_preg$GAD_T2_group <- ifelse(
+  is.na(combined_preg$GAD7_T2),
+  NA,
+  ifelse(combined_preg$GAD7_T2 >= 7, 1, 0)
+)
+combined_preg$GAD_T2_group <- as.factor(combined_preg$GAD_T2_group)
+levels(combined_preg$GAD_T2_group) <- c("Low GAD", "High GAD")
+
+table(combined_preg$GAD_T2_group, combined_preg$SPDD_T2_group)
+
+# T1
+combined_preg$SPDD_T1_group <- ifelse(
+  is.na(combined_preg$SPDD_T1),
+  NA,
+  ifelse(combined_preg$SPDD_T1 > 0, 1, 0)
+)
+
+combined_preg$SPDD_T1_group <- as.factor(combined_preg$SPDD_T1_group)
+levels(combined_preg$SPDD_T1_group) <- c("Non-typical", "Typical")
+
+combined_preg$GAD_T1_group <- ifelse(
+  is.na(combined_preg$GAD7_T1),
+  NA,
+  ifelse(combined_preg$GAD7_T1 >= 7, 1, 0)
+)
+
+combined_preg$GAD_T1_group <- as.factor(combined_preg$GAD_T1_group)
+levels(combined_preg$GAD_T1_group) <- c("Low GAD", "High GAD")
+
+table(combined_preg$GAD_T1_group, combined_preg$SPDD_T1_group)
 ```
 
 ```{r distribution, echo=FALSE, warning=FALSE, message=FALSE}
@@ -191,51 +230,46 @@ AIC(lm_mod, pois_mod, nb_mod)
 
 # Descriptives: Table 1
 
-```{r table_1, echo=FALSE, warning=FALSE, message=FALSE}
-# =============================================================================
-# TABLE 1 CODE 
-# =============================================================================
-
+```{r table_1, echo=FALSE, message=FALSE, warning=FALSE}
 table_1 <- subset_3pad %>%
   transmute(
     pid,
     age = gb1_age,
     bmi,
-
+    
     education = factor(if_else(edu == "University", "University", "Lower")),
     country   = factor(if_else(country == "Sweden", "Sweden", "Other")),
-
+    
     # Binary variables (CLEAN YES/NO STANDARD)
     Medication = factor(if_else(meds == 1, "Yes", "No")),
-    SSRI       = factor(if_else(SSRI == "Yes", "Yes", "No")),
     PCOS       = factor(if_else(pcos == "Yes", "Yes", "No")),
-
+    
     # T1 outcomes
     EPDS_T1 = gb1_epds_sum,
     GAD7_T1 = gb1_gad7_sum,
-
+    
     parity_T1 = factor(if_else(gb1_first_preg == 1, "Nulliparous", "Multiparous")),
     anemia_T1 = factor(if_else(gb1_anemia == 1, "Anemic", "Not anemic")),
-
+    
     gest_week_T1 = as.numeric(gb1_preg_week),
-
+    
     relationship_status_T1 = factor(if_else(gb1_relationship == 1, "Yes", "No")),
-
+    
     exercise_T1 = factor(if_else(exercise1 == "Moderate to high",
                                  "Moderate to high", "Low to none")),
-
+    
     pos_LE1 = factor(if_else(pos_LE1 == "Yes", "Yes", "No")),
     neg_LE1 = factor(if_else(neg_LE1 == "Yes", "Yes", "No")),
-
+    
     # T2 outcomes
     EPDS_T2 = gb2_epds_sum,
     GAD7_T2 = gb2_gad7_sum,
-
+    
     parity_T2 = factor(if_else(gb2_first_preg == 1, "Nulliparous", "Multiparous")),
     Anemia_T2 = factor(if_else(gb2_anemia == 1, "Anemic", "Not anemic")),
-
+    
     gest_week_T2 = as.numeric(gb2_preg_week),
-
+    
     neg_LE2 = factor(if_else(neg_LE2 == "Yes", "Yes", "No")),
     pos_LE2 = factor(if_else(pos_LE2 == "Yes", "Yes", "No"))
   )
@@ -258,143 +292,172 @@ table_1 <- table_1 %>%
     EPDS_high_T2 = factor(if_else(EPDS_T2 >= 10, "High", "Low"))
   )
 
-table_1_T1 <- table_1 %>% 
-  dplyr::select(-EPDS_high_T2, -GAD_high_T2, -Anemia_T2, -neg_LE2, -pos_LE2, -gest_week_T2)
+# --- Sanity check before building tables: confirm EPDS_high_T2 and GAD_high_T2
+# don't have different missingness, since that's what previously shifted
+# Anemia_T2's row position between t2_epds and t2_gad
+table_1 %>% count(is.na(EPDS_high_T2))
+table_1 %>% count(is.na(GAD_high_T2))
 
-table_1_T2 <- table_1 %>% 
-  dplyr::select(pid, EPDS_high_T2, GAD_high_T2, Anemia_T2, neg_LE2, pos_LE2, gest_week_T2, EPDS_T2, GAD7_T2)
+# --- Fix column order ONCE here, so every downstream tbl_summary() call
+# (which defaults to data-frame column order when no `sort` is given)
+# produces identical row order across T1 and T2, and across EPDS and GAD
+t1_var_order <- c(
+  "age", "bmi", "education", "country",
+  "relationship_status_T1", "exercise_T1", "anemia_T1",
+  "gest_week_T1", "pos_LE1", "neg_LE1",
+  "Medication", "PCOS", "Parity",
+  "EPDS_T1", "GAD7_T1", "EPDS_T2", "GAD7_T2"
+)
 
+t2_var_order <- c(
+  "gest_week_T2", "Anemia_T2", "pos_LE2", "neg_LE2",
+  "EPDS_T2", "GAD7_T2"
+)
+
+table_1_T1 <- table_1 %>%
+  dplyr::select(pid, all_of(t1_var_order), EPDS_high_T1, GAD_high_T1)
+
+table_1_T2 <- table_1 %>%
+  dplyr::select(pid, all_of(t2_var_order), EPDS_high_T2, GAD_high_T2)
+
+# ============================================================
+# T1 tables
+# ============================================================
 
 t1_epds <- table_1_T1 %>%
   dplyr::select(-pid, -GAD_high_T1) %>%
-
   tbl_summary(
     by = EPDS_high_T1,
     type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
     missing = "ifany",
     missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
     label = list(
       relationship_status_T1 ~ "In a relationship",
       exercise_T1 ~ "Exercise level",
-      anemia_T1 ~ "Self-reported anemia (T1)",
+      anemia_T1 ~ "Anemia (T1)",
       country ~ "Country of birth",
       age ~ "Maternal age",
-      gest_week_T1 ~ "Gestational week (T1)",
+      Medication ~ "Psychotropic medications",
+      gest_week_T1 ~ "GW (T1)",
       education ~ "Educational attainment",
-      pos_LE1 ~ "Recent positive life events (T1)",
-      neg_LE1 ~ "Recent negative life events (T1)",
+      pos_LE1 ~ "Pos. LE (T1)",
+      neg_LE1 ~ "Neg. LE (T1)",
       EPDS_T1 ~ "EPDS score (T1)",
       GAD7_T1 ~ "GAD7 score (T1)",
       EPDS_T2 ~ "EPDS score (T2)",
       GAD7_T2 ~ "GAD7 score (T2)",
-      bmi ~ "BMI"
+      bmi ~ "BMI",
+      PCOS ~ "PCOS*"
     )
   ) %>%
-
   modify_header(
-    stat_1 ~ "**High (≥10)**",
+    stat_1 ~ "**High (\u226510)**",
     stat_2 ~ "**Low (<10)**"
   ) %>%
-  modify_spanning_header(update = all_stat_cols() ~ "**EPDS score**") %>% 
-
-  add_overall() %>%
+  modify_spanning_header(update = all_stat_cols() ~ "**EPDS score**") %>%
   bold_labels() %>%
   italicize_levels()
 
+t1_gad <- table_1_T1 %>%
+  dplyr::select(-pid, -EPDS_high_T1) %>%
+  tbl_summary(
+    by = GAD_high_T1,
+    type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
+    missing = "ifany",
+    missing_text = "Missing",
+    statistic = all_continuous() ~ "{mean} ({sd})",
+    digits = all_categorical() ~ 1,
+    label = list(
+      relationship_status_T1 ~ "In a relationship",
+      exercise_T1 ~ "Exercise level",
+      anemia_T1 ~ "Anemia (T1)",
+      country ~ "Country of birth",
+      age ~ "Maternal age",
+      gest_week_T1 ~ "GW (T1)",
+      education ~ "Educational attainment",
+      pos_LE1 ~ "Pos. LE (T1)",
+      neg_LE1 ~ "Neg. LE (T1)",
+      EPDS_T1 ~ "EPDS score (T1)",
+      GAD7_T1 ~ "GAD7 score (T1)",
+      EPDS_T2 ~ "EPDS score (T2)",
+      GAD7_T2 ~ "GAD7 score (T2)",
+      bmi ~ "BMI",
+      PCOS ~ "PCOS*",
+      Medication ~ "Psychotropic medications"
+    )
+  ) %>%
+  modify_header(
+    stat_1 ~ "**High (\u22657)**",
+    stat_2 ~ "**Low (<7)**"
+  ) %>%
+  modify_spanning_header(update = all_stat_cols() ~ "**GAD7 score**") %>%
+  bold_labels() %>%
+  italicize_levels()
+
+# ============================================================
+# T2 tables
+# ============================================================
 
 t2_epds <- table_1_T2 %>%
   dplyr::select(-pid, -GAD_high_T2) %>%
   tbl_summary(
     by = EPDS_high_T2,
-    missing = "ifany",
-    missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
     type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
-    statistic = all_continuous() ~ "{mean} ({sd})",
-    digits = all_categorical() ~ 1,
-      label =  list(gest_week_T2 ~ "Gestational week (T2)", 
-pos_LE2 ~ "Recent positive life events (T2)",
-neg_LE2 ~ "Recent negative life events (T2)",
-Anemia_T2 ~ "Self reported anemia (T2)", EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)")) %>%
-  add_overall() %>% 
-  bold_labels() %>% 
-  italicize_levels()
-
-t_epds <- tbl_stack(list(t1_epds, t2_epds), group_header = c("T1", "T2"))
-
-t1_gad <- table_1_T1 %>%
-  dplyr::select(-pid, -EPDS_high_T1) %>%
-
-  tbl_summary(
-    by = GAD_high_T1,
-    type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
-    sort = all_categorical() ~ "frequency",
     missing = "ifany",
     missing_text = "Missing",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
     label = list(
-      relationship_status_T1 ~ "In a relationship",
-      exercise_T1 ~ "Exercise level",
-      anemia_T1 ~ "Self-reported anemia (T1)",
-      country ~ "Country of birth",
-      age ~ "Maternal age",
-      gest_week_T1 ~ "Gestational week (T1)",
-      education ~ "Educational attainment",
-      pos_LE1 ~ "Recent positive life events (T1)",
-      neg_LE1 ~ "Recent negative life events (T1)",
-      EPDS_T1 ~ "EPDS score (T1)",
-      GAD7_T1 ~ "GAD7 score (T1)",
+      gest_week_T2 ~ "GW (T2)",
+      pos_LE2 ~ "Pos. LE (T2)",
+      neg_LE2 ~ "Neg. LE (T2)",
+      Anemia_T2 ~ "Anemia (T2)",
       EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)",
-      bmi ~ "BMI"
+      GAD7_T2 ~ "GAD7 score (T2)"
     )
   ) %>%
-
-  modify_header(
-    stat_1 ~ "**High (≥7)**",
-    stat_2 ~ "**Low (<7)**"
-  ) %>%
-  modify_spanning_header(update = all_stat_cols() ~ "**GAD7 score**") %>% 
   bold_labels() %>%
-  italicize_levels() 
-
-
+  italicize_levels()
 
 t2_gad <- table_1_T2 %>%
   dplyr::select(-pid, -EPDS_high_T2) %>%
   tbl_summary(
     by = GAD_high_T2,
+    type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
     missing = "ifany",
     missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
-    type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
-      label =  list(gest_week_T2 ~ "Gestational week (T2)", 
-pos_LE2 ~ "Recent positive life events (T2)",
-neg_LE2 ~ "Recent negative life events (T2)",
-Anemia_T2 ~ "Self-reported anemia (T2)", EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)"))%>%
-  bold_labels() %>% 
-  italicize_levels() 
+    label = list(
+      gest_week_T2 ~ "GW (T2)",
+      pos_LE2 ~ "Pos. LE (T2)",
+      neg_LE2 ~ "Neg. LE (T2)",
+      Anemia_T2 ~ "Anemia (T2)",
+      EPDS_T2 ~ "EPDS score (T2)",
+      GAD7_T2 ~ "GAD7 score (T2)"
+    )
+  ) %>%
+  bold_labels() %>%
+  italicize_levels()
+
+# ============================================================
+# Merge and stack
+# ============================================================
 
 t1_table <- tbl_merge(list(t1_epds, t1_gad), tab_spanner = c("**EPDS score**", "**GAD7 score**"))
 t2_table <- tbl_merge(list(t2_epds, t2_gad))
 
 full_table <- tbl_stack(list(t1_table, t2_table), group_header = c("T1", "T2"))
 
-
 full_table %>%
   as_gt()
 
 full_table %>%
   as_flex_table() %>%
-  autofit() %>%             
+  autofit() %>%
+  flextable::add_footer_lines("High depressive symptoms: EPDS ≥10(Levis et al., 2020); high anxiety: GAD-7 ≥7(Gong et al., 2021; Sinesi et al., 2019). Columns show the outcome groups at each timepoint; T1 and T2 indicate stratification by outcomes at the respective timepoint. Pos. LE = Recent positive life events, Neg. LE = recent negative life events, GW = Gestational week. Complete EPDS/GAD-7 data were available for 98 participants at T1, 86 at T2, and 81 at both (13% attrition). Psychotropic medications refers to use of SSRIs, tricyclic antidepressants and antihistamines, commonly prescribed for anxiety in Sweden, Anemia is self-reported. *Recently renamed PMOS.") %>%
   flextable::save_as_docx(path = "table1.docx")
 ```
 
@@ -442,7 +505,7 @@ digraph DAG {
   # ── Key covariates (top row, above exposure+outcome) ───────────────────────
   age    [label = 'Age',                fillcolor = '#E6F2EC', fontcolor = '#1A3D2B', color = '#6BA888', pos = '0,5!']
   parity [label = 'Parity',             fillcolor = '#E6F2EC', fontcolor = '#1A3D2B', color = '#6BA888', pos = '2,5!']
-  ssri   [label = 'SSRI / medications', fillcolor = '#E6F2EC', fontcolor = '#1A3D2B', color = '#6BA888', pos = '4,5!']
+  ssri   [label = 'Psychotropic medication', fillcolor = '#E6F2EC', fontcolor = '#1A3D2B', color = '#6BA888', pos = '4,5!']
   anemia [label = 'Anemia',             fillcolor = '#E6F2EC', fontcolor = '#1A3D2B', color = '#6BA888', pos = '6,5!']
 
   # ── Potential covariates (right column) ────────────────────────────────────
@@ -482,6 +545,8 @@ rsvg_png(svg_raw, file = "dag_final.png", width = 2400)
 
 dag
 ```
+
+> [Figure 2] **Directed Acyclic Graph illustrating the covariates considered and identifying the minimal sufficient adjustment set used in the analyses.** Anemia, age, parity, and SSRI use (green) were identified as the minimal sufficient adjustment set and were included in the regression models
 
 # Descriptives and Stroop effects
 
@@ -861,35 +926,66 @@ tbl_cross
 ```
 
 ```{r full tables, echo=FALSE}
-gtsummary::tbl_regression(gad_t1_adj, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_t2_adj, exponentiate = TRUE)
-gtsummary::tbl_regression(epds_t1_adj, exponentiate = TRUE)
-gtsummary::tbl_regression(epds_t2_adj, exponentiate = TRUE)
-
 library(gtsummary)
 library(dplyr)
 
-t1 <- tbl_regression(gad_t1_adj, exponentiate = TRUE)
-t2 <- tbl_regression(gad_t2_adj, exponentiate = TRUE)
-t3 <- tbl_regression(epds_t1_adj, exponentiate = TRUE)
-t4 <- tbl_regression(epds_t2_adj, exponentiate = TRUE)
+single_row_vars <- c("parity", "anemia_T1", "meds", "anemia_T2")
 
-combined <- tbl_merge(
-  tbls = list(t1, t2, t3, t4),
-  tab_spanner = c("GAD T1", "GAD T2", "EPDS T1", "EPDS T2")
+# --- T1 models ---
+t1_models <- list(
+  "GAD T1"  = gad_t1_adj,
+  "EPDS T1" = epds_t1_adj
 )
 
-combined
+t1_tbls <- lapply(t1_models, function(model) {
+  vars_present <- intersect(single_row_vars, names(model$model))
+  
+  tbl_regression(
+    model,
+    exponentiate = TRUE,
+    show_single_row = c("anemia_T1", "parity", "meds")
+  ) %>%
+    bold_labels() %>% 
+    bold_p()	
+})
 
+t1_table <- tbl_merge(
+  tbls = t1_tbls,
+  tab_spanner = names(t1_tbls)
+)
+
+# --- T2 models ---
+t2_models <- list(
+  "GAD T2"  = gad_t2_adj,
+  "EPDS T2" = epds_t2_adj
+)
+
+t2_tbls <- lapply(t2_models, function(model) {
+  vars_present <- intersect(single_row_vars, names(model$model))
+  
+  tbl_regression(
+    model,
+    exponentiate = TRUE,
+    show_single_row = c("anemia_T2", "parity", "meds")
+  ) %>%
+    bold_labels() %>% 
+    bold_p()	
+  
+})
+
+t2_table <- tbl_merge(
+  tbls = t2_tbls,
+  tab_spanner = names(t2_tbls)
+)
+
+t2_table
 library(flextable)
 library(officer)
 
 save_as_docx(
-  `GAD T1` = as_flex_table(t1),
-  `GAD T2` = as_flex_table(t2),
-  `EPDS T1` = as_flex_table(t3),
-  `EPDS T2` = as_flex_table(t4),
-  path = "regression_tables.docx"
+  `Table T1` = as_flex_table(t1_table),
+  `Table T2` = as_flex_table(t2_table),
+  path = "regression_T1_T2_tables.docx"
 )
 ```
 
@@ -948,19 +1044,18 @@ p_gad <- ggplot(gad_spdd, aes(x = timepoint, y = estimate, color = model_type, g
   )
 
 ggsave(
-  filename = "GAD_SPDD.tiff",
+  filename = "GAD_SPDD.pdf",
   plot = p_gad,
+  device = cairo_pdf,   # optional, but gives better embedded fonts
   width = 6,
   height = 4,
-  units = "in",
-  dpi = 600,
-  compression = "lzw"
+  units = "in"
 )
 
 p_gad
 ```
 
-**Figure [X].** Illustration of the sign change of SPDD across timepoints. Unadjusted and Adjusted incidence rate ratios for SPDD and concurrent symptoms of anxiety. Estimates are from negative binomial regression models, with 95% confidence intervals indicated by vertical bars. Reference line at OR = 1 indicates null effect.
+**[Figure 3].** Illustration of the sign change of SPDD across timepoints. Unadjusted and Adjusted incidence rate ratios for SPDD and concurrent symptoms of anxiety. Estimates are from negative binomial regression models, with 95% confidence intervals indicated by vertical bars. Reference line at OR = 1 indicates null effect.
 
 # Prospective modelling
 
@@ -976,6 +1071,68 @@ gad_pros <- with(imp, glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + GAD7_T1, fami
 # EPDS ≥ 10 at T2 and pupil measures at T1
 
 epds_pros <- with(imp, glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age + EPDS_T1, family = binomial))
+
+# GAD-7 ≥ 7 at T2 and pupil measures at T1
+gad_pros_full <- with(imp, glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + meds + parity + anemia_T1 + GAD7_T1, family = binomial))
+
+# EPDS ≥ 10 at T2 and pupil measures at T1
+
+epds_pros_full <- with(imp, glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age + meds + parity + anemia_T1 + EPDS_T1, family = binomial))
+
+# GAD-7 ≥ 7 at T2 and pupil measures at T1
+gad_pros_unadj <- with(imp, glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1, family = binomial))
+
+# EPDS ≥ 10 at T2 and pupil measures at T1
+
+epds_pros_unadj <- with(imp, glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1, family = binomial))
+```
+
+```{r RR_models, echo=FALSE}
+
+gad_pros <- with(
+  imp,
+  glm(
+    EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age + EPDS_T1,
+    family = poisson(link = "log")
+  )
+)
+
+t1 <- tbl_regression(gad_pros, exponentiate = TRUE) %>% 
+  bold_p()
+
+t1
+
+
+cca_pros <- glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age + EPDS_T1,
+family = poisson(link = "log"), data = combined_preg)
+
+t1 <- tbl_regression(cca_pros, exponentiate = TRUE) %>% 
+  bold_p()
+
+t1
+```
+
+```{r}
+library(gtsummary)
+
+t1 <- tbl_regression(gad_pros_unadj, exponentiate = TRUE) %>% 
+  bold_p()	
+t2 <- tbl_regression(epds_pros_unadj, exponentiate = TRUE) %>% bold_p()	
+
+combined <- tbl_merge(
+  tbls = list(t1, t2),
+  tab_spanner = c("GAD-7 ≥ 7", "EPDS ≥ 10")
+)
+
+combined
+
+library(flextable)
+library(officer)
+
+save_as_docx(
+  `Prospective analysis` = as_flex_table(combined),
+  path = "prospective_unadj_tables.docx"
+)
 ```
 
 ## **Imputation‑adjusted pseudo‑R²**
@@ -1096,14 +1253,36 @@ tbl_pros
 ```
 
 ```{r full_pros, echo=FALSE}
-t1 <- gtsummary::tbl_regression(gad_pros, exponentiate = TRUE)
-t2 <- gtsummary::tbl_regression(epds_pros, exponentiate = TRUE)
+library(gtsummary)
+
+t1 <- tbl_regression(gad_pros, exponentiate = TRUE) %>% 
+  bold_p()	
+t2 <- tbl_regression(epds_pros, exponentiate = TRUE) %>% bold_p()	
+
+combined <- tbl_merge(
+  tbls = list(t1, t2),
+  tab_spanner = c("GAD-7 ≥ 7", "EPDS ≥ 10")
+)
+
+combined
+
+library(flextable)
+library(officer)
 
 save_as_docx(
-  `GAD-7 ≥ 7` = as_flex_table(t1),
-  `EPDS ≥ 10` = as_flex_table(t2),
+  `Prospective analysis` = as_flex_table(combined),
   path = "prospective_full_tables.docx"
 )
+```
+
+```{r pros_full_covariates, echo=FALSE}
+epds_full_tbl <- tbl_regression(epds_pros_full, exponentiate = TRUE, show_single_row = c("parity", "anemia_T1", "meds") ) %>% bold_labels() %>% bold_p()
+
+gad_full_tbl <- tbl_regression(gad_pros_full, exponentiate = TRUE, show_single_row = c("parity", "anemia_T1", "meds")) %>% bold_labels() %>% bold_p()
+
+pros_full_merged <- tbl_merge( tbls = list(epds_full_tbl, gad_full_tbl), tab_spanner = c("EPDS T2 ≥10", "GAD7 T2 ≥7") )
+
+pros_full_merged %>% as_flex_table() %>% flextable::save_as_docx(path = "pros_full.docx")
 ```
 
 ```{r forest_plot, echo=FALSE, warning=FALSE, message=FALSE}
@@ -1112,6 +1291,7 @@ library(dplyr)
 library(ggplot2)
 library(mice)
 library(broom.mixed)
+
 
 # Extract and pool both models
 get_or <- function(fit, model_name) {
@@ -1122,8 +1302,8 @@ get_or <- function(fit, model_name) {
 }
 
 plot_data <- bind_rows(
-  get_or(gad_pros, "GAD-7 ≥ 7 (T2)"),
-  get_or(epds_pros, "EPDS ≥ 10 (T2)")
+  get_or(gad_pros, "GAD-7 \u2265 7 (T2)"),
+  get_or(epds_pros, "EPDS \u2265 10 (T2)")
 )
 
 library(dplyr)
@@ -1137,44 +1317,116 @@ plot_data_pub <- plot_data %>%
       term == "IPDD_T1" ~ "IPDD (T1)",
       term == "SPDD_T1" ~ "SPDD (T1)"
     ),
-    model = factor(model, levels = c("GAD-7 ≥ 7 (T2)", "EPDS ≥ 10 (T2)"))
+    model = factor(model, levels = c("GAD-7 \u2265 7 (T2)", "EPDS \u2265 10 (T2)"))
   )
 
 # Professional plot
 p <- ggplot(plot_data_pub, aes(x = estimate, y = term_name, color = model, shape = model)) +
-  geom_vline(xintercept = 1, linetype = "solid", linewidth = 0.5, color = "black") +
-  geom_point(size = 3.5, position = position_dodge(width = 0.6)) +
+  geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.5, color = "black") +
+  geom_point(size = 2, position = position_dodge(width = 0.6)) +
   geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
-                 height = 0.3, linewidth = 0.8, position = position_dodge(width = 0.6)) +
+                 height = 0.1, linewidth = 0.6, position = position_dodge(width = 0.6)) +
   scale_x_log10(breaks = c(0.5, 1, 2, 4), labels = c("0.5", "1.0", "2.0", "4.0")) +
-  scale_color_manual(values = c("#0072B2", "#D55E00")) + # Professional blue/orange
+  scale_color_manual(values = c("#0072B2", "#CC79A7")) + # Professional blue/orange
   labs(x = "Odds ratio (95% CI)", y = NULL, color = NULL, shape = NULL) +
-  theme_classic(base_size = 14) +
+  theme_classic(base_size = 12) +
   theme(
     legend.position = "bottom",
-    axis.text = element_text(color = "black", size = 12),
+    axis.text = element_text(color = "black", size = 11),
     axis.line.y = element_blank(),
-    panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3)
+    panel.grid.major.x = element_line(color = "grey90", linewidth = 0.4)
   )
 
-ggsave(
-  filename = "forest_plot.tiff",
-  plot = p,
-  width = 6,
-  height = 4,
-  units = "in",
-  dpi = 600,
-  compression = "lzw"
-)
+ggsave("IPDD_SPDD_OR_plot.pdf", plot = p, width = 8, height = 6)
 
 p
 ```
 
-**Figure [X].** Adjusted odds ratios for pupil indices at T1 predicting symptom thresholds at T2. Estimates are from logistic regression models for GAD-7 (≥ 7) and EPDS (≥ 10), with 95% confidence intervals indicated by horizontal bars. Reference line at OR = 1 indicates null effect.
+**[Figure 4].** Adjusted odds ratios for pupil indices at T1 predicting symptom thresholds at T2. Estimates are from logistic regression models for GAD-7 (≥ 7) and EPDS (≥ 10), with 95% confidence intervals indicated by horizontal bars. Reference line at OR = 1 indicates null effect.
+
+# Additional/Sensitivity analysis
+
+```{r unadj_pros, echo=FALSE}
+
+unadj_g <- tbl_regression(gad_pros_unadj, exponentiate = TRUE) %>% 
+  bold_p()	
+unadj_e <- tbl_regression(epds_pros_unadj, exponentiate = TRUE) %>% bold_p()	
+
+unadj <- tbl_merge(
+  tbls = list(unadj_g, unadj_e),
+  tab_spanner = c("GAD-7 ≥ 7", "EPDS ≥ 10")
+)
+
+unadj
+
+library(flextable)
+library(officer)
+
+save_as_docx(
+  `Unadjusted analysis` = as_flex_table(unadj),
+  path = "prospective_unadjusted.docx"
+)
+```
+
+```{r nb_pros, echo=FALSE}
+#EPDS T2
+# Unadjusted
+epds_unadj <- with(
+  imp,
+  glm.nb(EPDS_T2 ~ SPDD_T1 + IPDD_T1)
+)
+# Adjusted
+epds_adj <- with(
+  imp,
+  glm.nb(EPDS_T2 ~ SPDD_T1 + IPDD_T1 + age + parity + anemia_T1 + meds)
+)
+
+# GAD7 T2
+# Unadjusted
+gad_unadj <- with(
+  imp,
+  glm.nb(GAD7_T1 ~ SPDD_T1 + IPDD_T1)
+)
+
+# Adjusted
+gad_adj <- with(
+  imp,
+  glm.nb(GAD7_T2 ~ SPDD_T1 + IPDD_T1 + age + parity + anemia_T1 + meds)
+)
+
+
+unadj_g <- tbl_regression(gad_unadj, exponentiate = TRUE) %>% 
+  bold_p()	
+adj_g <- tbl_regression(gad_adj, exponentiate = TRUE) %>% bold_p()	
+
+combined_g <- tbl_merge(
+  tbls = list(unadj_g, adj_g),
+  tab_spanner = c("Unadjusted", "Adjusted")
+)
+
+combined_g
+
+
+unadj_e <- tbl_regression(epds_unadj, exponentiate = TRUE) %>% 
+  bold_p()	
+adj_e <- tbl_regression(epds_adj, exponentiate = TRUE) %>% bold_p()	
+
+combined_e <- tbl_merge(
+  tbls = list(unadj_e, adj_e),
+  tab_spanner = c("Unadjusted", "Adjusted")
+)
+
+combined_e
+
+library(flextable)
+library(officer)
+
+#save_as_docx(`Prospective analysis` = as_flex_table(combined), path = "prospective_full_tables.docx" )
+```
 
 # Sensitivity analysis: Complete case analysis (CCA)
 
-```{r CCA, echo=FALSE}
+```{r CCA, echo=FALSE, warning=FALSE}
 
 # Complete case analysis
 # EPDS T1
@@ -1203,15 +1455,6 @@ gad_t2_unadj <- glm.nb(GAD7_T2 ~ SPDD_T2 + IPDD_T2, data = combined_preg)
 # Adjusted
 gad_t2_adj <- glm.nb(GAD7_T2 ~ SPDD_T2 + IPDD_T2 + age + parity + anemia_T2 + meds, data = combined_preg)
 
-gtsummary::tbl_regression(epds_t1_unadj, exponentiate = TRUE)
-gtsummary::tbl_regression(epds_t1_adj, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_t1_unadj, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_t1_adj, exponentiate = TRUE)
-
-gtsummary::tbl_regression(epds_t2_unadj, exponentiate = TRUE)
-gtsummary::tbl_regression(epds_t2_adj, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_t2_unadj, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_t2_adj, exponentiate = TRUE)
 
 # Prospective CCA
 
@@ -1220,9 +1463,6 @@ gad_pros <- glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + GAD7_T1, family = binom
 
 epds_pros <- glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age + EPDS_T1, family = binomial, data = combined_preg)
 
-gtsummary::tbl_regression(epds_pros, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_pros, exponentiate = TRUE)
-
 # Prosepective CCA: full covariates 
 
 gad_pros_full <- glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + parity + anemia_T1 + meds +  GAD7_T1, family = binomial, data = combined_preg)
@@ -1230,20 +1470,152 @@ gad_pros_full <- glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + parity + anemia_T1
 
 epds_pros_full <- glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age +  parity + anemia_T1 + meds + EPDS_T1, family = binomial, data = combined_preg)
 
-gtsummary::tbl_regression(epds_pros_full, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_pros_full, exponentiate = TRUE)
+
+all_models <- list(
+  EPDS_T1_unadj = epds_t1_unadj,
+  EPDS_T1_adj   = epds_t1_adj,
+  GAD_T1_unadj  = gad_t1_unadj,
+  GAD_T1_adj    = gad_t1_adj,
+  EPDS_T2_unadj = epds_t2_unadj,
+  EPDS_T2_adj   = epds_t2_adj,
+  GAD_T2_unadj  = gad_t2_unadj,
+  GAD_T2_adj    = gad_t2_adj
+)
+
+tbls <- lapply(all_models, function(model) {
+  
+  vars_wanted <- c("parity", "anemia_T1", "meds", "anemia_T2")
+  vars_present <- intersect(vars_wanted, names(model$model))
+  
+  tbl_regression(
+    model,
+    exponentiate = TRUE,
+    show_single_row = vars_present
+  )
+})
+
+names(tbls) <- names(all_models)
+
+sensitivity_stack <- tbl_stack(
+  tbls = tbls,
+  group_header = names(all_models)
+)
 ```
 
-# Sensitivity analysis: Full covariate set prospective
+```{r sensitivity_tables, echo=FALSE, warning=FALSE}
+library(gtsummary)
+p_load(broom)
+
+
+epds_full_tbl <- tbl_regression(epds_pros_full, exponentiate = TRUE,  show_single_row = c("parity", "anemia_T1", "meds")
+) %>% 
+  bold_labels() %>% 
+  bold_p()
+
+gad_full_tbl  <- tbl_regression(gad_pros_full, exponentiate = TRUE, show_single_row = c("parity", "anemia_T1", "meds")) %>% 
+  bold_labels() %>% 
+  bold_p()
+
+pros_full_merged <- tbl_merge(
+  tbls = list(epds_full_tbl, gad_full_tbl),
+  tab_spanner = c("EPDS T2 ≥10", "GAD7 T2 ≥7")
+)
+
+epds_tbl <- tbl_regression(epds_pros, exponentiate = TRUE) %>% 
+  bold_labels() %>% 
+  bold_p()
+
+gad_tbl  <- tbl_regression(gad_pros, exponentiate = TRUE) %>% 
+  bold_labels() %>% 
+  bold_p()
+
+pros_merged <- tbl_merge(
+  tbls = list(epds_tbl, gad_tbl),
+  tab_spanner = c("EPDS T2 ≥10", "GAD7 T2 ≥7")
+)
+
+
+pros_full_merged
+sensitivity_stack
+
+library(gtsummary)
+
+sensitivity_stack %>% 
+  as_flex_table() %>% 
+  flextable::save_as_docx(path = "sensitivity_analysis_cross.docx")
+
+pros_merged %>% 
+  as_flex_table() %>% 
+  flextable::save_as_docx(path = "sensitivity_pros.docx")
+
+pros_full_merged %>% 
+  as_flex_table() %>% 
+  flextable::save_as_docx(path = "sensitivity_pros_full.docx")
+
+```
+
+```{r session_info, include=FALSE}
+library(sessioninfo)
+capture.output(session_info(), file = "session_info.txt")
+```
 
 ```{r}
-# GAD-7 ≥ 7 at T2 and pupil measures at T1
-gad_pros <- with(imp, glm(GAD7_T2 >= 7 ~ IPDD_T1 + SPDD_T1 + age + GAD7_T1 + parity + anemia_T1, family = binomial))
+plot(combined_preg$SPDD_T2, combined_preg$GAD7_T2,
+     xlab = "SPDD (T2)",
+     ylab = "GAD7 (T2)",
+     main = "SPDD vs GAD7 at T2",
+     pch = 19)
 
-# EPDS ≥ 10 at T2 and pupil measures at T1
+# Add a regression line to see the direction of the association
+abline(lm(GAD7_T2 ~ SPDD_T2, data = combined_preg), col = "red")
 
-epds_pros <- with(imp, glm(EPDS_T2 >= 10 ~ IPDD_T1 + SPDD_T1 + age +  parity + anemia_T1 + EPDS_T1, family = binomial))
+cor.test(combined_preg$SPDD_T2, combined_preg$GAD7_T2)
 
-gtsummary::tbl_regression(epds_pros, exponentiate = TRUE)
-gtsummary::tbl_regression(gad_pros, exponentiate = TRUE)
+
 ```
+
+```{r}
+plot(combined_preg$SPDD_T1, combined_preg$GAD7_T1,
+     xlab = "SPDD (T1)",
+     ylab = "GAD7 (T1)",
+     main = "SPDD vs GAD7 at T1",
+     pch = 19)
+
+# Add a regression line to see the direction of the association
+abline(lm(GAD7_T1 ~ SPDD_T1, data = combined_preg), col = "red")
+
+cor.test(combined_preg$SPDD_T1, combined_preg$GAD7_T1)
+```
+
+```{r}
+plot(combined_preg$IPDD_T1, combined_preg$GAD7_T2,
+     xlab = "IPDD (T2)",
+     ylab = "GAD7 (T2)",
+     main = "SPDD vs GAD7 at T2",
+     pch = 19)
+
+# Add a regression line to see the direction of the association
+abline(lm(GAD7_T2 ~ IPDD_T1, data = combined_preg), col = "red")
+
+?lincom
+```
+
+## References
+
+Al Hinai, F. I., & Al Hinai, S. S. (2014). Prospective Study on Prevalence and Risk Factors of Postpartum Depression in Al-Dakhliya Governorate in Oman. *Oman medical journal*, *29*(3), 198-202. <https://doi.org/10.5001/omj.2014.49>
+
+Ammann, P., Jeong, A., Lovison, G., Doetzer, J., Fuhrimann, S., Imboden, M.,…Probst-Hensch, N. (2025). Depression and anxiety symptoms in male and female farmers: association with farm characteristics and mental health protection strategies in the FarmCoSwiss cohort. *BMC public health*, *26*(1), 101-118. <https://doi.org/10.1186/s12889-025-25407-z>
+
+Clery, P., Hayes, J. F., Launders, N., Thompson, R., Kandola, A., Osborn, D. P. J.,…Dykxhoorn, J. (2025). The association between outdoor ambient temperature and depression and mania: An ecological momentary assessment study. *Journal of affective disorders*, *379*, 457-466. <https://doi.org/10.1016/j.jad.2025.03.046>
+
+Dettori, J. R., Norvell, D. C., & Chapman, J. R. (2018). The Sin of Missing Data: Is All Forgiven by Way of Imputation? *Global spine journal*, *8*(8), 892-894. <https://doi.org/10.1177/2192568218811922>
+
+Guo, M., Wang, Y., Liu, J., & Dong, X. (2023). Ethnic enclaves, social capital, and psychological well-being of immigrants: the case of Chinese older immigrants in Chicago. *Aging & mental health*, *27*(6), 1077-1085. <https://doi.org/10.1080/13607863.2022.2084506>
+
+Huang, A. R., Reed, N. S., Deal, J. A., Arnold, M., Burgard, S., Chisolm, T.,…Lin, F. R. (2024). Depression and Health-Related Quality of Life Among Older Adults With Hearing Loss in the ACHIEVE Study. *Journal of applied gerontology*, *43*(5), 550-561. <https://doi.org/10.1177/07334648231212291>
+
+Ku, P. W., Steptoe, A., Liao, Y., Sun, W. J., & Chen, L. J. (2018). Prospective relationship between objectively measured light physical activity and depressive symptoms in later life. *International journal of geriatric psychiatry*, *33*(1), 58-65. <https://doi.org/10.1002/gps.4672>
+
+Wang, W., Su, Y., Li, R., Tu, H., Jin, J., Zhang, Y.,…Wu, C. (2025). Association between different frequencies of age-related hearing loss and depression: A Mendelian randomization and observational study. *Journal of psychosomatic research*, *195*, 112187-112187. <https://doi.org/10.1016/j.jpsychores.2025.112187>
+
+Zhang, Y., Kuang, J., Xin, Z., Fang, J., Song, R., Yang, Y.,…Wang, J. (2023). Loneliness, social isolation, depression and anxiety among the elderly in Shanghai: Findings from a longitudinal study. *Archives of gerontology and geriatrics*, *110*, 104980. <https://doi.org/10.1016/j.archger.2023.104980>
