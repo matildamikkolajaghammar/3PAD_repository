@@ -1,33 +1,27 @@
 # This CITATION.cff file was generated with cffinit.
-
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
 title: 3PAD Repository
 message: >-
-If you use this software, please cite it using the
-metadata from this file.
+  If you use this software, please cite it using the
+  metadata from this file.
 type: software
 authors:
-
-* given-names: Matilda
-  family-names: Mikkola Jäghammar
-  email: [matilda.mikkola.jaghammar@ki.se](mailto:matilda.mikkola.jaghammar@ki.se)
-  affiliation: Karolinska Institutet
-  orcid: 'https://orcid.org/0009-0000-2748-2044'
-  identifiers:
-* type: doi
-  value: 10.5281/zenodo.22657032
-  repository-code: >-
-  https://github.com/matildamikkolajaghammar/3PAD_repository.git
-  preferred-citation:
-  type: software-code
-  authors:
-
-  * given-names: Matilda
+  - given-names: Matilda
     family-names: Mikkola Jäghammar
+    email: matilda.mikkola.jaghammar@ki.se
     affiliation: Karolinska Institutet
     orcid: 'https://orcid.org/0009-0000-2748-2044'
-    title: 3PAD Repository
-    doi: 10.5281/zenodo.22657032
-
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22657032
+repository-code: >-
+  https://github.com/matildamikkolajaghammar/3PAD_repository.git
+preferred-citation:
+  type: software-code
+  title: 3PAD Repository
+  authors:
+    - given-names: Matilda
+      family-names: Mikkola Jäghammar
+  doi: 10.5281/zenodo.22657032
