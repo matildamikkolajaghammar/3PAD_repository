@@ -1,5 +1,5 @@
-# 2PAD repository
-### Physiological predictors of anxiety and depression (2PAD)
+# 3PAD repository
+### Physiological predictors of postpartum  anxiety and depression (3PAD)
 ### Matilda Mikkola Jäghammar,MSc, 17/06/26
 
 This repository accompanies the project “Initial and Sustained Pupillary Conflict Responses as Predictors of Antenatal Anxiety and Depression.” It provides the R code used to conduct the analyses presented in the study.
