@@ -1,47 +1,45 @@
 # =============================================================================
 # TABLE 1 CODE 
 # =============================================================================
-
 table_1 <- subset_3pad %>%
   transmute(
     pid,
     age = gb1_age,
     bmi,
-
+    
     education = factor(if_else(edu == "University", "University", "Lower")),
     country   = factor(if_else(country == "Sweden", "Sweden", "Other")),
-
+    
     # Binary variables (CLEAN YES/NO STANDARD)
     Medication = factor(if_else(meds == 1, "Yes", "No")),
-    SSRI       = factor(if_else(SSRI == "Yes", "Yes", "No")),
     PCOS       = factor(if_else(pcos == "Yes", "Yes", "No")),
-
+    
     # T1 outcomes
     EPDS_T1 = gb1_epds_sum,
     GAD7_T1 = gb1_gad7_sum,
-
+    
     parity_T1 = factor(if_else(gb1_first_preg == 1, "Nulliparous", "Multiparous")),
     anemia_T1 = factor(if_else(gb1_anemia == 1, "Anemic", "Not anemic")),
-
+    
     gest_week_T1 = as.numeric(gb1_preg_week),
-
+    
     relationship_status_T1 = factor(if_else(gb1_relationship == 1, "Yes", "No")),
-
+    
     exercise_T1 = factor(if_else(exercise1 == "Moderate to high",
                                  "Moderate to high", "Low to none")),
-
+    
     pos_LE1 = factor(if_else(pos_LE1 == "Yes", "Yes", "No")),
     neg_LE1 = factor(if_else(neg_LE1 == "Yes", "Yes", "No")),
-
+    
     # T2 outcomes
     EPDS_T2 = gb2_epds_sum,
     GAD7_T2 = gb2_gad7_sum,
-
+    
     parity_T2 = factor(if_else(gb2_first_preg == 1, "Nulliparous", "Multiparous")),
     Anemia_T2 = factor(if_else(gb2_anemia == 1, "Anemic", "Not anemic")),
-
+    
     gest_week_T2 = as.numeric(gb2_preg_week),
-
+    
     neg_LE2 = factor(if_else(neg_LE2 == "Yes", "Yes", "No")),
     pos_LE2 = factor(if_else(pos_LE2 == "Yes", "Yes", "No"))
   )
@@ -64,143 +62,170 @@ table_1 <- table_1 %>%
     EPDS_high_T2 = factor(if_else(EPDS_T2 >= 10, "High", "Low"))
   )
 
-table_1_T1 <- table_1 %>% 
-  dplyr::select(-EPDS_high_T2, -GAD_high_T2, -Anemia_T2, -neg_LE2, -pos_LE2, -gest_week_T2)
+# --- Sanity check before building tables: confirm EPDS_high_T2 and GAD_high_T2
+# don't have different missingness, since that's what previously shifted
+# Anemia_T2's row position between t2_epds and t2_gad
+table_1 %>% count(is.na(EPDS_high_T2))
+table_1 %>% count(is.na(GAD_high_T2))
 
-table_1_T2 <- table_1 %>% 
-  dplyr::select(pid, EPDS_high_T2, GAD_high_T2, Anemia_T2, neg_LE2, pos_LE2, gest_week_T2, EPDS_T2, GAD7_T2)
+# --- Fix column order ONCE here, so every downstream tbl_summary() call
+# (which defaults to data-frame column order when no `sort` is given)
+# produces identical row order across T1 and T2, and across EPDS and GAD
+t1_var_order <- c(
+  "age", "bmi", "education", "country",
+  "relationship_status_T1", "exercise_T1", "anemia_T1",
+  "gest_week_T1", "pos_LE1", "neg_LE1",
+  "Medication", "PCOS", "Parity",
+  "EPDS_T1", "GAD7_T1", "EPDS_T2", "GAD7_T2"
+)
 
+t2_var_order <- c(
+  "gest_week_T2", "Anemia_T2", "pos_LE2", "neg_LE2",
+  "EPDS_T2", "GAD7_T2"
+)
+
+table_1_T1 <- table_1 %>%
+  dplyr::select(pid, all_of(t1_var_order), EPDS_high_T1, GAD_high_T1)
+
+table_1_T2 <- table_1 %>%
+  dplyr::select(pid, all_of(t2_var_order), EPDS_high_T2, GAD_high_T2)
+
+# ============================================================
+# T1 tables
+# ============================================================
 
 t1_epds <- table_1_T1 %>%
   dplyr::select(-pid, -GAD_high_T1) %>%
-
   tbl_summary(
     by = EPDS_high_T1,
     type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
     missing = "ifany",
     missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
     label = list(
       relationship_status_T1 ~ "In a relationship",
       exercise_T1 ~ "Exercise level",
-      anemia_T1 ~ "Self-reported anemia (T1)",
+      anemia_T1 ~ "Anemia (T1)",
       country ~ "Country of birth",
       age ~ "Maternal age",
-      gest_week_T1 ~ "Gestational week (T1)",
+      Medication ~ "Psychotropic medications",
+      gest_week_T1 ~ "GW (T1)",
       education ~ "Educational attainment",
-      pos_LE1 ~ "Recent positive life events (T1)",
-      neg_LE1 ~ "Recent negative life events (T1)",
+      pos_LE1 ~ "Pos. LE (T1)",
+      neg_LE1 ~ "Neg. LE (T1)",
       EPDS_T1 ~ "EPDS score (T1)",
       GAD7_T1 ~ "GAD7 score (T1)",
       EPDS_T2 ~ "EPDS score (T2)",
       GAD7_T2 ~ "GAD7 score (T2)",
-      bmi ~ "BMI"
+      bmi ~ "BMI",
+      PCOS ~ "PCOS*"
     )
   ) %>%
-
   modify_header(
-    stat_1 ~ "**High (≥10)**",
+    stat_1 ~ "**High (\u226510)**",
     stat_2 ~ "**Low (<10)**"
   ) %>%
-  modify_spanning_header(update = all_stat_cols() ~ "**EPDS score**") %>% 
-
-  add_overall() %>%
+  modify_spanning_header(update = all_stat_cols() ~ "**EPDS score**") %>%
   bold_labels() %>%
   italicize_levels()
 
+t1_gad <- table_1_T1 %>%
+  dplyr::select(-pid, -EPDS_high_T1) %>%
+  tbl_summary(
+    by = GAD_high_T1,
+    type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
+    missing = "ifany",
+    missing_text = "Missing",
+    statistic = all_continuous() ~ "{mean} ({sd})",
+    digits = all_categorical() ~ 1,
+    label = list(
+      relationship_status_T1 ~ "In a relationship",
+      exercise_T1 ~ "Exercise level",
+      anemia_T1 ~ "Anemia (T1)",
+      country ~ "Country of birth",
+      age ~ "Maternal age",
+      gest_week_T1 ~ "GW (T1)",
+      education ~ "Educational attainment",
+      pos_LE1 ~ "Pos. LE (T1)",
+      neg_LE1 ~ "Neg. LE (T1)",
+      EPDS_T1 ~ "EPDS score (T1)",
+      GAD7_T1 ~ "GAD7 score (T1)",
+      EPDS_T2 ~ "EPDS score (T2)",
+      GAD7_T2 ~ "GAD7 score (T2)",
+      bmi ~ "BMI",
+      PCOS ~ "PCOS*",
+      Medication ~ "Psychotropic medications"
+    )
+  ) %>%
+  modify_header(
+    stat_1 ~ "**High (\u22657)**",
+    stat_2 ~ "**Low (<7)**"
+  ) %>%
+  modify_spanning_header(update = all_stat_cols() ~ "**GAD7 score**") %>%
+  bold_labels() %>%
+  italicize_levels()
+
+# ============================================================
+# T2 tables
+# ============================================================
 
 t2_epds <- table_1_T2 %>%
   dplyr::select(-pid, -GAD_high_T2) %>%
   tbl_summary(
     by = EPDS_high_T2,
-    missing = "ifany",
-    missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
     type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
-    statistic = all_continuous() ~ "{mean} ({sd})",
-    digits = all_categorical() ~ 1,
-      label =  list(gest_week_T2 ~ "Gestational week (T2)", 
-pos_LE2 ~ "Recent positive life events (T2)",
-neg_LE2 ~ "Recent negative life events (T2)",
-Anemia_T2 ~ "Self reported anemia (T2)", EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)")) %>%
-  add_overall() %>% 
-  bold_labels() %>% 
-  italicize_levels()
-
-t_epds <- tbl_stack(list(t1_epds, t2_epds), group_header = c("T1", "T2"))
-
-t1_gad <- table_1_T1 %>%
-  dplyr::select(-pid, -EPDS_high_T1) %>%
-
-  tbl_summary(
-    by = GAD_high_T1,
-    type = c(gest_week_T1, bmi, EPDS_T1, EPDS_T2, GAD7_T1, GAD7_T2, age) ~ "continuous",
-    sort = all_categorical() ~ "frequency",
     missing = "ifany",
     missing_text = "Missing",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
     label = list(
-      relationship_status_T1 ~ "In a relationship",
-      exercise_T1 ~ "Exercise level",
-      anemia_T1 ~ "Self-reported anemia (T1)",
-      country ~ "Country of birth",
-      age ~ "Maternal age",
-      gest_week_T1 ~ "Gestational week (T1)",
-      education ~ "Educational attainment",
-      pos_LE1 ~ "Recent positive life events (T1)",
-      neg_LE1 ~ "Recent negative life events (T1)",
-      EPDS_T1 ~ "EPDS score (T1)",
-      GAD7_T1 ~ "GAD7 score (T1)",
+      gest_week_T2 ~ "GW (T2)",
+      pos_LE2 ~ "Pos. LE (T2)",
+      neg_LE2 ~ "Neg. LE (T2)",
+      Anemia_T2 ~ "Anemia (T2)",
       EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)",
-      bmi ~ "BMI"
+      GAD7_T2 ~ "GAD7 score (T2)"
     )
   ) %>%
-
-  modify_header(
-    stat_1 ~ "**High (≥7)**",
-    stat_2 ~ "**Low (<7)**"
-  ) %>%
-  modify_spanning_header(update = all_stat_cols() ~ "**GAD7 score**") %>% 
   bold_labels() %>%
-  italicize_levels() 
-
-
+  italicize_levels()
 
 t2_gad <- table_1_T2 %>%
   dplyr::select(-pid, -EPDS_high_T2) %>%
   tbl_summary(
     by = GAD_high_T2,
+    type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
     missing = "ifany",
     missing_text = "Missing",
-    sort = all_categorical() ~ "frequency",
-    type = c(gest_week_T2, EPDS_T2, GAD7_T2) ~ "continuous",
     statistic = all_continuous() ~ "{mean} ({sd})",
     digits = all_categorical() ~ 1,
-      label =  list(gest_week_T2 ~ "Gestational week (T2)", 
-pos_LE2 ~ "Recent positive life events (T2)",
-neg_LE2 ~ "Recent negative life events (T2)",
-Anemia_T2 ~ "Self-reported anemia (T2)", EPDS_T2 ~ "EPDS score (T2)",
-      GAD7_T2 ~ "GAD7 score (T2)"))%>%
-  bold_labels() %>% 
-  italicize_levels() 
+    label = list(
+      gest_week_T2 ~ "GW (T2)",
+      pos_LE2 ~ "Pos. LE (T2)",
+      neg_LE2 ~ "Neg. LE (T2)",
+      Anemia_T2 ~ "Anemia (T2)",
+      EPDS_T2 ~ "EPDS score (T2)",
+      GAD7_T2 ~ "GAD7 score (T2)"
+    )
+  ) %>%
+  bold_labels() %>%
+  italicize_levels()
+
+# ============================================================
+# Merge and stack
+# ============================================================
 
 t1_table <- tbl_merge(list(t1_epds, t1_gad), tab_spanner = c("**EPDS score**", "**GAD7 score**"))
 t2_table <- tbl_merge(list(t2_epds, t2_gad))
 
 full_table <- tbl_stack(list(t1_table, t2_table), group_header = c("T1", "T2"))
 
-
 full_table %>%
   as_gt()
 
 full_table %>%
   as_flex_table() %>%
-  autofit() %>%             
+  autofit() %>%
+  flextable::add_footer_lines("High depressive symptoms: EPDS ≥10(Levis et al., 2020); high anxiety: GAD-7 ≥7(Gong et al., 2021; Sinesi et al., 2019). Columns show the outcome groups at each timepoint; T1 and T2 indicate stratification by outcomes at the respective timepoint. Pos. LE = Recent positive life events, Neg. LE = recent negative life events, GW = Gestational week. Complete EPDS/GAD-7 data were available for 98 participants at T1, 86 at T2, and 81 at both (13% attrition). Psychotropic medications refers to use of SSRIs, tricyclic antidepressants and antihistamines, commonly prescribed for anxiety in Sweden, Anemia is self-reported. *Recently renamed PMOS.") %>%
   flextable::save_as_docx(path = "table1.docx")
-
-
