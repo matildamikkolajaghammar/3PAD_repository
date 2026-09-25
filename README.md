@@ -25,6 +25,8 @@ figures/: Code for generating plots and visualizations.
 
 tables/: Code for producing summary tables and model outputs.
 
+imputation/: Code for MICE procedure
+
 
 ## Methods
 
