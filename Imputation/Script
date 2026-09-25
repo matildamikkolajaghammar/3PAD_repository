@@ -1,0 +1,54 @@
+# Initialize mice
+ini  <- mice(combined_preg, maxit = 0, printFlag = FALSE)
+meth <- ini$method
+pred <- ini$predictorMatrix
+post <- ini$post
+
+# Structure variable types
+base_covars <- c("age", "parity", "anemia_T1", "meds", "bmi", "gest_week_T1", "pss_T1", "SPD_Mean_T1", "IPD_Mean_T1", "PAR_mean_T1",
+  "PD_mean_T1","PD_meandiff_T1")  
+t2_covars <- c("age", "parity", "anemia_T1", "meds", "bmi", "gest_week_T2", "pss_T2", "PD_meandiff_T2","PARD_T1","PARD_T2", "PAR_mean_T2")  
+t1_vars <- c("EPDS_T1", "GAD7_T1", "IPDD_T1", "SPDD_T1")  
+
+# Decide predictor matrices, perserving temporal structure
+pred["EPDS_T1", c(base_covars, "GAD7_T1", "IPDD_T1", "SPDD_T1")] <- 1 
+pred["GAD7_T1", c(base_covars, "EPDS_T1", "IPDD_T1", "SPDD_T1")] <- 1  
+pred["IPDD_T1", c(base_covars, "EPDS_T1", "GAD7_T1", "SPDD_T1")] <- 1 
+pred["SPDD_T1", c(base_covars, "EPDS_T1", "GAD7_T1", "IPDD_T1")] <- 1  
+
+pred["EPDS_T2", ] <- 0
+pred["EPDS_T2", c(base_covars, t1_vars)] <- 1
+
+pred["GAD7_T2", ] <- 0
+pred["GAD7_T2", c(base_covars, t1_vars)] <- 1
+
+pred["IPDD_T2", ] <- 0
+pred["IPDD_T2", c(base_covars, t1_vars)] <- 1
+
+pred["SPDD_T2", ] <- 0
+pred["SPDD_T2", c(base_covars, t1_vars)] <- 1
+
+# Don't impute participant id
+no_impute <- c("pid")
+
+pred[no_impute, ] <- 0            
+bin_vars <- c("anemia_T1", "anemia_T2",
+              "parity",
+              "meds")
+
+bin_vars <- bin_vars[!(bin_vars %in% no_impute)]
+meth[bin_vars] <- "logreg" # binary variables use logistic regression with bootstrapping
+
+# Then run mice
+imp <- mice(
+  data            = combined_preg,
+  m               = 30,
+  method          = meth,           
+  predictorMatrix = pred,
+  post            = post,
+  maxit           = 10,
+  seed            = 555, 
+  printFlag       = FALSE
+)
+imp$method # Check correct methods (pmm for continous)
+plot(imp) # Visualize imputation patterns
