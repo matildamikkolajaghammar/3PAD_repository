@@ -1631,6 +1631,142 @@ pros_full_merged %>%
 capture.output(session_info(), file = "session_info.txt")
 ```
 
+
+
+# Sensitivity analysis: Linear regression
+
+```{r model_spec_sens, echo=FALSE}
+
+# EPDS T1
+# Unadjusted
+epds_t1_unadj_lm <- with(
+  imp,
+  lm(EPDS_T1 ~ SPDD_T1 + IPDD_T1)
+)
+# Adjusted
+epds_t1_adj_lm <- with(
+  imp,
+  lm(EPDS_T1 ~ SPDD_T1 + IPDD_T1 + age + parity + anemia_T1 + meds)
+)
+
+
+# GAD7 T1
+# Unadjusted
+gad_t1_unadj_lm <- with(
+  imp,
+  lm(GAD7_T1 ~ SPDD_T1 + IPDD_T1)
+)
+# Adjusted
+gad_t1_adj_lm <- with(
+  imp,
+ lm(GAD7_T1 ~ SPDD_T1 + IPDD_T1 + age + parity + anemia_T1 + meds)
+)
+
+#EPDS T2
+# Unadjusted
+epds_t2_unadj_lm <- with(
+  imp,
+ lm(EPDS_T2 ~ SPDD_T2 + IPDD_T2)
+)
+# Adjusted
+epds_t2_adj_lm <- with(
+  imp,
+ lm(EPDS_T2 ~ SPDD_T2 + IPDD_T2 + age + parity + anemia_T2 + meds)
+)
+
+# GAD7 T2
+# Unadjusted
+gad_t2_unadj_lm <- with(
+  imp,
+  lm(GAD7_T2 ~ SPDD_T2 + IPDD_T2)
+)
+
+# Adjusted
+gad_t2_adj_lm <- with(
+  imp,
+  lm(GAD7_T2 ~ SPDD_T2 + IPDD_T2 + age + parity + anemia_T2 + meds)
+)
+
+#T1 GAD Table
+gad_t1_unadj_table_lm <- tbl_regression(gad_t1_unadj_lm, label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)")) %>% bold_labels() %>% 
+  italicize_levels() 
+
+gad_t1_adj_table_lm <- tbl_regression(gad_t1_adj_lm, include = c(SPDD_T1, IPDD_T1), label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)"))  %>% bold_labels() %>% 
+  italicize_levels() 
+
+tbl_gad_t1_lm <- tbl_merge(list(gad_t1_unadj_table_lm, gad_t1_adj_table_lm), tab_spanner = c("**Unadjusted**", "**Adjusted**"))
+
+tbl_gad_t1_lm
+
+# T2 GAD Table
+gad_t2_unadj_table_lm <- tbl_regression(gad_t2_unadj_lm, label =  list(SPDD_T2 ~ "SPDD (T2)", IPDD_T2 ~ "IPDD (T2)")) %>% bold_labels() %>% 
+  italicize_levels() 
+
+gad_t2_adj_table_lm <- tbl_regression(gad_t2_adj_lm, include = c(SPDD_T2, IPDD_T2), label =  list(SPDD_T2 ~ "SPDD (T2)", IPDD_T2 ~ "IPDD (T2)"))  %>% bold_labels() %>% 
+  italicize_levels() 
+
+tbl_gad_t2_lm <- tbl_merge(list(gad_t2_unadj_table_lm, gad_t2_adj_table_lm), tab_spanner = c("**Unadjusted**", "**Adjusted**"))
+
+tbl_gad_t2_lm
+
+#T1 EPDS Table
+epds_t1_unadj_table_lm <- tbl_regression(epds_t1_unadj_lm, label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)")) %>% bold_labels() %>% 
+  italicize_levels() 
+
+epds_t1_adj_table_lm <- tbl_regression(epds_t1_adj_lm, include = c(SPDD_T1, IPDD_T1), label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)"))  %>% bold_labels() %>% italicize_levels() 
+
+tbl_epds_t1_lm <- tbl_merge(list(epds_t1_unadj_table_lm, epds_t1_adj_table_lm), tab_spanner = c("**Unadjusted**", "**Adjusted**"))
+
+tbl_epds_t1_lm
+tbl_epds_t1
+
+
+# T2 EPDS Table
+epds_t2_unadj_table_lm <- tbl_regression(epds_t2_unadj_lm, label =  list(SPDD_T2 ~ "SPDD (T2)", IPDD_T2 ~ "IPDD (T2)")) %>% bold_labels() %>% 
+  italicize_levels()
+
+epds_t2_adj_table_lm<- tbl_regression(epds_t2_adj_lm, include = c(SPDD_T2, IPDD_T2), label =  list(SPDD_T2 ~ "SPDD (T2)", IPDD_T2 ~ "IPDD (T2)"))  %>% bold_labels() %>% 
+  italicize_levels() %>% add_glance_source_note() 
+
+
+tbl_epds_t2_lm <- tbl_merge(list(epds_t2_unadj_table_lm, epds_t2_adj_table_lm), tab_spanner = c("**Unadjusted**", "**Adjusted**"))
+
+tbl_epds_t2_lm
+
+## Cross-sectional results were consistent in direction and magnitude across model specifications.##
+
+# Sensitivity analysis: Prospective; Alternate cutoffs (≥12 and ≥8)
+
+> As a sensitivity analysis, we repeated the analyses using more stringent thresholds (GAD-7 ≥8 and EPDS ≥12), resulting in smaller groups (14 and 17 participants, respectively).
+
+```{r sens_cut_off, echo=FALSE}
+
+# GAD-7 ≥ 10 at T2 and pupil measures at T1
+gad_pros_co10 <- with(imp, glm(GAD7_T2 >= 8 ~ IPDD_T1 + SPDD_T1 + GAD7_T1, family = binomial))
+
+# EPDS ≥ 13 at T2 and pupil measures at T1
+
+epds_pros_co13 <- with(imp, glm(EPDS_T2 >= 12 ~ IPDD_T1 + SPDD_T1 + EPDS_T1, family = binomial))
+
+
+epds_pros_tbl_co13 <- tbl_regression(epds_pros_co13, exponentiate = T, include = c(SPDD_T1, IPDD_T1), label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)")) %>% 
+  bold_labels() %>% 
+  italicize_levels() 
+
+gad_pros_tbl_co10 <- tbl_regression(gad_pros_co10, exponentiate = T, include = c(SPDD_T1, IPDD_T1), label =  list(SPDD_T1 ~ "SPDD (T1)", IPDD_T1 ~ "IPDD (T1)")) %>% 
+  bold_labels() %>% 
+  italicize_levels()
+
+tbl_pros_co <- tbl_stack(list(gad_pros_tbl_co10, epds_pros_tbl_co13), group_header = c("GAD-7 ≥ 8 (T2)", "EPDS ≥ 12 (T2)"))
+
+tbl_pros_co <- tbl_pros_co %>% modify_header(groupname_col ~ "**Outcome**", label ~ "**Exposure**")
+
+tbl_pros_co
+```
+For SPDD, the estimates were essentially unchanged when the GAD-7 threshold was increased from ≥7 to ≥8 (OR 0.99, 95% CI 0.60–1.64 vs. OR 0.97, 95% CI 0.58–1.63). For IPDD, the corresponding estimate was slightly attenuated with the higher GAD-7 threshold (OR 0.70, 95% CI 0.49–0.99 vs. OR 0.73, 95% CI 0.51–1.05), with wider confidence intervals. For EPDS, the association with IPDD was similar in direction and magnitude when using ≥12 compared with ≥10 (OR 0.64, 95% CI 0.44–0.94 vs. OR 0.72, 95% CI 0.53–0.98). The association with SPDD remained imprecisely estimated under both EPDS thresholds.
+
+
+```
 ## References
 
 Al Hinai, F. I., & Al Hinai, S. S. (2014). Prospective Study on Prevalence and Risk Factors of Postpartum Depression in Al-Dakhliya Governorate in Oman. *Oman medical journal*, *29*(3), 198-202. <https://doi.org/10.5001/omj.2014.49>
