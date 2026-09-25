@@ -1,71 +1,176 @@
+## Figure 1:
+pupil_long <- subset_3pad %>%
+  dplyr::select(pid, gb1_epds_sum, gb1_gad7_sum, PARDiff, PTRDiff, PAADiff) %>%
+  pivot_longer(
+    cols = c(PARDiff, PTRDiff, PAADiff),
+    names_to = "measure",
+    values_to = "difference"
+  ) %>%
+  mutate(
+    EPDS_group = if_else(
+      gb1_epds_sum >= 10,
+      "EPDS ≥10",
+      "EPDS <10"),
+    GAD_group = if_else(
+      gb1_gad7_sum >= 7,
+      "GAD ≥7",
+      "GAD <7"),
+    measure = factor(
+      measure,
+      levels = c("PARDiff", "PTRDiff", "PAADiff"),
+      labels = c(
+        "Response\n±250 ms",
+        "Initial<br>(500–850 ms)",
+        "Sustained<br>(2128–4138 ms)"
+      )
+    )
+  )
 
-get_spdd <- function(fit, term_label, timepoint, model_type) {
-  pooled <- pool(fit)
-  tidy(pooled, conf.int = TRUE, exponentiate = TRUE) %>%
-    filter(term == term_label) %>%
+pupil_long2 <- subset_3pad %>%
+  dplyr::select(pid, gb2_epds_sum, gb2_gad7_sum, PARDiff2, PTRDiff2, PAADiff2) %>%
+  pivot_longer(
+    cols = c(PARDiff2, PTRDiff2, PAADiff2),
+    names_to = "measure",
+    values_to = "difference"
+  ) %>%
+  mutate(
+    EPDS_group = if_else(
+      gb2_epds_sum >= 10,
+      "EPDS ≥10",
+      "EPDS <10"),
+    GAD_group = if_else(
+      gb2_gad7_sum >= 7,
+      "GAD ≥7",
+      "GAD <7"),
+    measure = factor(
+      measure,
+      levels = c("PARDiff2", "PTRDiff2", "PAADiff2"),
+      labels = c(
+        "Response\n±250 ms",
+        "Initial<br>(500\u2013850 ms)",
+        "Sustained<br>(2128–4138 ms)"
+      )
+    )
+  )
+
+pupil_long <- pupil_long %>%
+  filter(!is.na(EPDS_group))
+pupil_long2 <- pupil_long2 %>%
+  filter(!is.na(EPDS_group))
+
+build_mean_data <- function(df, timepoint_label) {
+  bind_rows(
+    df %>%
+      group_by(measure, EPDS_group) %>%
+      summarise(difference = mean(difference, na.rm = TRUE), .groups = "drop") %>%
+      rename(level = EPDS_group) %>%
+      mutate(measure_type = "EPDS"),
+    df %>%
+      group_by(measure, GAD_group) %>%
+      summarise(difference = mean(difference, na.rm = TRUE), .groups = "drop") %>%
+      rename(level = GAD_group) %>%
+      mutate(measure_type = "GAD")
+  ) %>%
     mutate(
-      timepoint = factor(timepoint, levels = c("T1", "T2")),
-      model_type = factor(model_type, levels = c("Unadjusted", "Adjusted"))
+      risk = if_else(str_detect(level, "<"), "Low", "High"),
+      timepoint = timepoint_label
     )
 }
 
-gad_spdd <- bind_rows(
-  get_spdd(gad_t1_unadj, "SPDD_T1", "T1", "Unadjusted"),
-  get_spdd(gad_t1_adj,   "SPDD_T1", "T1", "Adjusted"),
-  get_spdd(gad_t2_unadj, "SPDD_T2", "T2", "Unadjusted"),
-  get_spdd(gad_t2_adj,   "SPDD_T2", "T2", "Adjusted")
+t1_label <- "T1 (early pregnancy), n = 92"
+t2_label <- "T2 (late pregnancy), n = 86"
+
+mean_data_t1 <- build_mean_data(pupil_long, t1_label)
+mean_data_t2 <- build_mean_data(pupil_long2, t2_label)
+
+mean_data_combined <- bind_rows(mean_data_t1, mean_data_t2) %>%
+  mutate(timepoint = factor(timepoint, levels = c(t1_label, t2_label)))
+
+existing_levels <- levels(factor(mean_data_combined$measure))
+is_baseline <- str_detect(existing_levels, regex("response", ignore_case = TRUE))
+ordered_levels <- c(existing_levels[is_baseline], existing_levels[!is_baseline])
+
+mean_data_combined <- mean_data_combined %>%
+  mutate(measure = factor(measure, levels = ordered_levels))
+
+measure_labels <- setNames(
+  ifelse(
+    is_baseline[match(ordered_levels, existing_levels)],
+    "<span style='color:grey50;font-style:italic'>Response</span>",
+    str_extract(ordered_levels, "^[A-Za-z]+")
+  ),
+  ordered_levels
 )
 
-pd <- position_dodge(width = 0.25)
-
-p_gad <- ggplot(gad_spdd, aes(x = timepoint, y = estimate, color = model_type, group = model_type)) +
-  geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.6, color = "grey45") +
-  geom_line(linewidth = 0.8, position = pd) +
-  geom_point(size = 2.8, position = pd) +
-  geom_errorbar(
-    aes(ymin = conf.low, ymax = conf.high),
-    width = 0.08,
-    linewidth = 0.7,
-    position = pd
+pupilplot_combined <- ggplot(
+  mean_data_combined,
+  aes(
+    x = measure,
+    y = difference,
+    colour = risk,
+    linetype = measure_type,
+    group = interaction(measure_type, risk)
+  )
+) +
+  annotate(
+    "rect",
+    xmin = 0.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
+    fill = "grey92", alpha = 0.6
   ) +
-  scale_y_log10(
-    breaks = c(0.5, 0.75, 1, 1.25, 1.5),
-    labels = number_format(accuracy = 0.01)
+  geom_vline(xintercept = 1.5, linetype = "dashed", colour = "grey60", linewidth = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dotted", colour = "grey50", linewidth = 0.4) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2.4) +
+  facet_wrap(~ timepoint) +
+  scale_colour_manual(
+    values = c("Low" = "#9EC5E0", "High" = "#08306B"),
+    labels = c("Low" = "Below cutoff", "High" = "At/above cutoff")
   ) +
-  scale_color_manual(values = c("Unadjusted" = "#1c9099", "Adjusted" = "#a6bddb")) +
+  scale_linetype_manual(values = c("EPDS" = "solid", "GAD" = "22")) +
+  scale_x_discrete(labels = measure_labels) +
+  guides(
+    colour = guide_legend(nrow = 2, byrow = TRUE),
+    linetype = guide_legend(nrow = 2, byrow = TRUE)
+  ) +
   labs(
     x = NULL,
-    y = "Incidence rate ratio for SPDD",
-    color = NULL) +
-  theme_classic(base_size = 13) +
+    y = "IC \u2212 C pupil response",
+    colour = "Symptom level",
+    linetype = "Measure"
+  ) +
+  theme_classic(base_size = 14, base_family = "sans") +
   theme(
-    legend.position = "bottom",
-    legend.text = element_text(size = 11),
-    axis.text = element_text(color = "black"),
+    axis.line = element_line(colour = "grey30", linewidth = 0.4),
+    axis.ticks = element_line(colour = "grey30", linewidth = 0.4),
+    axis.text = element_text(colour = "black"),
+    axis.text.x = element_markdown(size = 11, lineheight = 1.0, margin = margin(t = 4)),
     axis.title.y = element_text(margin = margin(r = 8)),
-    plot.subtitle = element_text(size = 11, color = "grey20"),
-    plot.margin = margin(8, 8, 8, 8)
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    legend.position = "bottom",
+    legend.box.spacing = unit(0.5, "cm"),
+    legend.margin = margin(t = 6),
+    legend.key.width = unit(1.4, "lines"),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 14, face = "plain", hjust = 0),
+    panel.spacing = unit(1.5, "lines"),
+    plot.margin = margin(7, 8, 10, 8)
   )
 
-ggsave(
-  filename = "GAD_SPDD.pdf",
-  plot = p_gad,
-  device = cairo_pdf,   # optional, but gives better embedded fonts
-  width = 6,
-  height = 4,
-  units = "in"
-)
+pupilplot_combined
 
-p_gad
+#ggsave(
+ # "pupil_T1_T2.tiff",
+ # plot = pupilplot_combined,
+ # width = 7,
+ # height = 4.5,
+ # dpi = 600,
+ # compression = "lzw"
+#)
 
-
-library(dplyr)
-library(ggplot2)
-library(mice)
-library(broom.mixed)
-
-
-# Extract and pool both models
+Figure 2: 
+# Extract and pool the OR estimates for IPDD/SPDD from both prospective models,
+# used by the forest plot below.
 get_or <- function(fit, model_name) {
   pooled <- pool(fit)
   tidy(pooled, conf.int = TRUE, exponentiate = TRUE) %>%
@@ -78,37 +183,94 @@ plot_data <- bind_rows(
   get_or(epds_pros, "EPDS \u2265 10 (T2)")
 )
 
-library(dplyr)
-library(ggplot2)
-library(ggtext)
-
-# Prepare data for a clean two-panel look
 plot_data_pub <- plot_data %>%
   mutate(
     term_name = case_when(
       term == "IPDD_T1" ~ "IPDD (T1)",
       term == "SPDD_T1" ~ "SPDD (T1)"
     ),
-    model = factor(model, levels = c("GAD-7 \u2265 7 (T2)", "EPDS \u2265 10 (T2)"))
+    model = factor(
+      model,
+      levels = c("GAD-7 \u2265 7 (T2)", "EPDS \u2265 10 (T2)"),
+      labels = c("Elevated\nGAD-7 (T2)", "Elevated\nEPDS (T2)")
+    ),
+    predictor = factor(term_name, levels = c("IPDD (T1)", "SPDD (T1)"))
   )
 
-# Professional plot
-p <- ggplot(plot_data_pub, aes(x = estimate, y = term_name, color = model, shape = model)) +
-  geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.5, color = "black") +
-  geom_point(size = 2, position = position_dodge(width = 0.6)) +
-  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
-                 height = 0.1, linewidth = 0.6, position = position_dodge(width = 0.6)) +
-  scale_x_log10(breaks = c(0.5, 1, 2, 4), labels = c("0.5", "1.0", "2.0", "4.0")) +
-  scale_color_manual(values = c("#0072B2", "#CC79A7")) + # Professional blue/orange
-  labs(x = "Odds ratio (95% CI)", y = NULL, color = NULL, shape = NULL) +
+p <- ggplot(
+  plot_data_pub,
+  aes(
+    x = estimate,
+    y = model,
+    color = model,
+    shape = predictor
+  )
+) +
+  geom_vline(
+    xintercept = 1,
+    linetype = "dashed",
+    linewidth = 0.4,
+    color = "black"
+  ) +
+  geom_point(
+    size = 3,
+    position = position_dodge(width = 0.6)
+  ) +
+  geom_errorbarh(
+    aes(xmin = conf.low, xmax = conf.high),
+    height = 0.2,
+    linewidth = 0.9,
+    position = position_dodge(width = 0.6)
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 1, 2, 4),
+    labels = c("0.5", "1.0", "2.0", "4.0"),
+    expand = expansion(mult = c(0.08, 0.08))
+  ) +
+  scale_y_discrete(
+    expand = expansion(mult = c(0.02, 0.02))
+  ) +
+  scale_color_manual(
+    values = c(
+      "Elevated\nGAD-7 (T2)" = "#97a6c4",
+      "Elevated\nEPDS (T2)" = "#384860"
+    ),
+    name = "Outcome",
+    guide = guide_legend(nrow = 2, byrow = TRUE)
+  ) +
+  scale_shape_manual(
+    values = c(
+      "IPDD (T1)" = 15,
+      "SPDD (T1)" = 17
+    ),
+    name = "Predictor",
+    guide = guide_legend(nrow = 2, byrow = TRUE)
+  ) +
+  labs(
+    x = "Odds ratio \n(per 0.1-unit increase in IPDD or SPDD)",
+    y = NULL
+  ) +
   theme_classic(base_size = 12) +
   theme(
     legend.position = "bottom",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
     axis.text = element_text(color = "black", size = 11),
     axis.line.y = element_blank(),
-    panel.grid.major.x = element_line(color = "grey90", linewidth = 0.4)
+    axis.ticks.y = element_blank(),
+    panel.grid.major.x = element_line(
+      color = "grey90",
+      linewidth = 0.4
+    ),
+    plot.margin = margin(7, 7, 7, 7)
   )
 
-ggsave("IPDD_SPDD_OR_plot.pdf", plot = p, width = 8, height = 6)
-
 p
+ggsave(
+  "IPDD_SPDD_OR.tiff",
+  plot = p,
+  width = 7,
+  height = 5,
+  dpi = 600,
+  compression = "lzw"
+)
